@@ -165,7 +165,7 @@ async function startServer() {
   app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     const trimmedEmail = email?.trim();
-    console.log(`Login attempt for: "${trimmedEmail}"`);
+    console.log(`Login route reached. Attempt for: "${trimmedEmail}"`);
     
     try {
       // Case-insensitive email check for better UX
@@ -338,6 +338,7 @@ async function startServer() {
 
   // API 404 Handler
   app.all('/api/*', (req, res) => {
+    console.log(`API 404: ${req.method} ${req.url}`);
     res.status(404).json({ success: false, message: `API route not found: ${req.method} ${req.url}` });
   });
 

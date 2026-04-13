@@ -2922,14 +2922,12 @@
             });
 
             const contentType = response.headers.get('content-type');
+            const text = await response.text();
             if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
                 console.error('Non-JSON response:', text);
-                // If it's HTML, it's likely a 404 or 500 from the server/proxy
-                throw new Error(`Server error (${response.status}). The server returned an unexpected format. Please check if the API is running.`);
+                throw new Error(`Server error (${response.status}). The server returned an unexpected format: ${text.slice(0, 50)}...`);
             }
-
-            const result = await response.json();
+            const result = JSON.parse(text);
 
             if (result.success) {
                 currentUser = result.user;
