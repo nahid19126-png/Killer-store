@@ -136,9 +136,15 @@ async function startServer() {
   });
 
   // --- API Routes ---
+  const apiRouter = express.Router();
+
+  // Health Check
+  apiRouter.get('/health', (req, res) => {
+    res.json({ success: true, message: 'API is healthy' });
+  });
 
   // Register Endpoint
-  app.post('/api/register', (req, res) => {
+  apiRouter.post('/register', (req, res) => {
     const { name, email, password } = req.body;
     console.log('Register attempt:', email);
     
@@ -162,7 +168,7 @@ async function startServer() {
   });
 
   // Login Endpoint
-  app.post('/api/login', (req, res) => {
+  apiRouter.post('/login', (req, res) => {
     const { email, password } = req.body;
     const trimmedEmail = email?.trim();
     console.log(`Login route reached. Attempt for: "${trimmedEmail}"`);
@@ -184,10 +190,8 @@ async function startServer() {
     }
   });
 
-  // --- App Management API ---
-
   // Get Editor's Choice
-  app.get('/api/apps/editors-choice', (req, res) => {
+  apiRouter.get('/apps/editors-choice', (req, res) => {
     try {
       const apps = db.prepare('SELECT * FROM apps WHERE is_editors_choice = 1').all();
       res.json({ success: true, apps });
@@ -197,12 +201,12 @@ async function startServer() {
   });
 
   // Reviews API
-  app.get('/api/apps/:id/reviews', (req, res) => {
+  apiRouter.get('/apps/:id/reviews', (req, res) => {
     const apps = db.prepare('SELECT * FROM reviews WHERE app_id = ? ORDER BY created_at DESC').all(req.params.id);
     res.json({ success: true, reviews: apps });
   });
 
-  app.post('/api/apps/:id/reviews', (req, res) => {
+  apiRouter.post('/apps/:id/reviews', (req, res) => {
     const { user_id, user_name, rating, comment } = req.body;
     db.prepare('INSERT INTO reviews (app_id, user_id, user_name, rating, comment) VALUES (?, ?, ?, ?, ?)')
       .run(req.params.id, user_id, user_name, rating, comment);
@@ -210,7 +214,7 @@ async function startServer() {
   });
 
   // Wishlist API
-  app.post('/api/wishlist', (req, res) => {
+  apiRouter.post('/wishlist', (req, res) => {
     const { user_id, app_id } = req.body;
     try {
       db.prepare('INSERT INTO wishlist (user_id, app_id) VALUES (?, ?)').run(user_id, app_id);
@@ -221,7 +225,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/wishlist/:user_id', (req, res) => {
+  apiRouter.get('/wishlist/:user_id', (req, res) => {
     const apps = db.prepare(`
       SELECT apps.* FROM apps 
       JOIN wishlist ON apps.id = wishlist.app_id 
@@ -231,7 +235,7 @@ async function startServer() {
   });
 
   // Rewards API
-  app.get('/api/rewards/:user_id', (req, res) => {
+  apiRouter.get('/rewards/:user_id', (req, res) => {
     let reward = db.prepare('SELECT * FROM rewards WHERE user_id = ?').get(req.params.user_id) as any;
     if (!reward) {
       db.prepare('INSERT INTO rewards (user_id, points) VALUES (?, 0)').run(req.params.user_id);
@@ -240,7 +244,7 @@ async function startServer() {
     res.json({ success: true, points: reward.points });
   });
 
-  app.post('/api/rewards/claim', (req, res) => {
+  apiRouter.post('/rewards/claim', (req, res) => {
     const { user_id, amount } = req.body;
     const points = amount || 10; // Use provided amount or default to 10
     db.prepare('UPDATE rewards SET points = points + ? WHERE user_id = ?').run(points, user_id);
@@ -248,7 +252,7 @@ async function startServer() {
   });
 
   // Upload App
-  app.post('/api/apps', (req, res) => {
+  apiRouter.post('/apps', (req, res) => {
     const { name, developer, description, icon_url, screenshot_url, download_url, category, size, rating, reviews_count, content_rating, tags } = req.body;
     try {
       const stmt = db.prepare(`
@@ -277,7 +281,7 @@ async function startServer() {
   });
 
   // Get All Apps
-  app.get('/api/apps', (req, res) => {
+  apiRouter.get('/apps', (req, res) => {
     try {
       const apps = db.prepare('SELECT * FROM apps ORDER BY created_at DESC').all();
       res.json({ success: true, apps });
@@ -288,7 +292,7 @@ async function startServer() {
   });
 
   // Delete All Apps (To remove demo apps as requested)
-  app.delete('/api/apps/clear', (req, res) => {
+  apiRouter.delete('/apps/clear', (req, res) => {
     try {
       db.prepare('DELETE FROM apps').run();
       res.json({ success: true, message: 'All apps cleared' });
@@ -298,7 +302,7 @@ async function startServer() {
   });
 
   // Update App
-  app.put('/api/apps/:id', (req, res) => {
+  apiRouter.put('/apps/:id', (req, res) => {
     const { name, developer, description, icon_url, screenshot_url, download_url, category, size, rating, reviews_count, tags, admin_secret } = req.body;
     
     // Simple admin check (in a real app, use sessions/tokens)
@@ -321,7 +325,7 @@ async function startServer() {
   });
 
   // Delete Individual App
-  app.delete('/api/apps/:id', (req, res) => {
+  apiRouter.delete('/apps/:id', (req, res) => {
     const { admin_secret } = req.body;
 
     if (admin_secret !== 'admin@123') {
@@ -335,6 +339,9 @@ async function startServer() {
       res.status(500).json({ success: false, message: err.message });
     }
   });
+
+  // Mount API Router
+  app.use('/api', apiRouter);
 
   // API 404 Handler
   app.all('/api/*', (req, res) => {

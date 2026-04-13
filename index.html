@@ -1527,6 +1527,18 @@
     let currentLang = 'en';
     let isRegisterMode = false;
 
+    // API Health Check
+    const checkApiHealth = async () => {
+        try {
+            const res = await fetch('/api/health');
+            const data = await res.json();
+            console.log('API Health Check:', data);
+        } catch (err) {
+            console.error('API Health Check Failed:', err);
+        }
+    };
+    checkApiHealth();
+
     // Search Filters Logic
     const searchFilters = document.querySelectorAll('.search-filter');
     searchFilters.forEach(filter => {
@@ -2912,10 +2924,11 @@
         const endpoint = isRegisterMode ? '/api/register' : '/api/login';
         const body = isRegisterMode ? { name, email, password } : { email, password };
 
-        console.log('Sending auth request:', { endpoint, email: body.email, passwordLength: body.password.length, isRegisterMode });
+        const fullUrl = window.location.origin + endpoint;
+        console.log('Sending auth request to:', fullUrl, { email: body.email, isRegisterMode });
 
         try {
-            const response = await fetch(endpoint, {
+            const response = await fetch(fullUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
