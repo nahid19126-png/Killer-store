@@ -1055,6 +1055,7 @@
         <div class="search-bar" role="search" id="searchBarContainer">
             <svg id="searchIconBtn" style="cursor: pointer;" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <input type="text" id="searchInput" placeholder="Search Killer Store" aria-label="Search apps and games">
+            <svg id="clearSearchBtn" style="cursor: pointer; display: none; margin-right: 8px; color: var(--on-surface-variant);" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             <svg id="micBtn" class="mic-btn" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
             <div class="avatar" id="avatarBtn" aria-label="Account menu">N</div>
         </div>
@@ -1673,53 +1674,38 @@
     const searchInput = document.getElementById('searchInput');
     const searchSuggestions = document.getElementById('searchSuggestions');
     const searchIconBtn = document.getElementById('searchIconBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
 
-    searchInput.addEventListener('input', () => {
-        const query = searchInput.value.toLowerCase().trim();
-        if (!query) {
-            searchSuggestions.style.display = 'none';
-            return;
-        }
+    searchInput.addEventListener('input', (e) => {
+        clearSearchBtn.style.display = searchInput.value ? 'block' : 'none';
+        showSuggestions(e.target.value);
+    });
+    searchInput.addEventListener('focus', (e) => showSuggestions(e.target.value));
 
-        const matches = allApps.filter(app => 
-            app.name.toLowerCase().includes(query) || 
-            app.category.toLowerCase().includes(query)
-        ).slice(0, 6);
-
-        if (matches.length > 0) {
-            searchSuggestions.innerHTML = matches.map(app => `
-                <div class="suggestion-item" onclick="openAppDetailsFromSearch(${JSON.stringify(app).replace(/"/g, '&quot;')})">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <span>${app.name}</span>
-                </div>
-            `).join('');
-            searchSuggestions.style.display = 'block';
-        } else {
-            searchSuggestions.style.display = 'none';
-        }
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchBtn.style.display = 'none';
+        searchSuggestions.style.display = 'none';
+        renderApps(allApps);
+        const sectionTitles = document.querySelectorAll('.section-title');
+        if (sectionTitles[0]) sectionTitles[0].textContent = i18n[currentLang].recommended;
+        searchInput.focus();
     });
 
-    window.openAppDetailsFromSearch = (app) => {
-        searchSuggestions.style.display = 'none';
-        searchInput.value = app.name;
-        openAppDetails(app);
-    };
-
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.search-bar') && !e.target.closest('.search-suggestions')) {
+        if (!searchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
             searchSuggestions.style.display = 'none';
         }
     });
     
-    const fakeSuggestions = [
-        'WhatsApp Messenger', 'Instagram', 'Facebook', 'TikTok', 
-        'Subway Surfers', 'Candy Crush Saga', 'Roblox', 'Among Us',
-        'Spotify: Music and Podcasts', 'Netflix', 'Disney+', 'YouTube',
-        'Google Maps', 'Gmail', 'Google Drive', 'Google Photos'
-    ];
-
     const performSearch = (query) => {
         searchSuggestions.style.display = 'none';
+        if (!query.trim()) {
+            renderApps(allApps);
+            const sectionTitles = document.querySelectorAll('.section-title');
+            if (sectionTitles[0]) sectionTitles[0].textContent = i18n[currentLang].recommended;
+            return;
+        }
         
         // Switch to home tab if not already there
         const homeTab = document.getElementById('home');
@@ -1733,37 +1719,56 @@
         const filteredApps = allApps.filter(app => 
             app.name.toLowerCase().includes(query.toLowerCase()) ||
             app.description.toLowerCase().includes(query.toLowerCase()) ||
-            app.category.toLowerCase().includes(query.toLowerCase())
+            app.category.toLowerCase().includes(query.toLowerCase()) ||
+            (app.tags && app.tags.toLowerCase().includes(query.toLowerCase()))
         );
         
+        // Update section title to show search results
+        const sectionTitles = document.querySelectorAll('.section-title');
+        if (sectionTitles[0]) sectionTitles[0].textContent = `Search Results for "${query}" (${filteredApps.length})`;
+        
         renderApps(filteredApps);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const showSuggestions = (query) => {
-        if (!query) {
+        if (!query.trim()) {
             searchSuggestions.style.display = 'none';
-            renderApps(allApps); // Show all apps if search is cleared
             return;
         }
 
-        const filtered = fakeSuggestions.filter(s => s.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
+        // Search through real apps for suggestions
+        const filtered = allApps.filter(app => 
+            app.name.toLowerCase().includes(query.toLowerCase()) ||
+            app.category.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 8);
         
         if (filtered.length > 0) {
-            searchSuggestions.innerHTML = filtered.map(s => `
-                <div class="suggestion-item">
+            let suggestionsHtml = filtered.map(app => `
+                <div class="suggestion-item" data-type="app" data-app='${JSON.stringify(app).replace(/'/g, "&apos;")}'>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <span>${s}</span>
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: 500;">${app.name}</span>
+                        <span style="font-size: 10px; color: var(--on-surface-variant);">${app.category}</span>
+                    </div>
                 </div>
             `).join('');
+            
+            // Add "Search for..." option
+            suggestionsHtml += `
+                <div class="suggestion-item" data-type="search" data-query="${query.replace(/"/g, '&quot;')}" style="border-top: 1px solid var(--outline); margin-top: 4px; padding-top: 12px; color: var(--primary);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <span style="font-weight: 500;">Search for "${query}"</span>
+                </div>
+            `;
+            
+            searchSuggestions.innerHTML = suggestionsHtml;
             searchSuggestions.style.display = 'block';
         } else {
             searchSuggestions.style.display = 'none';
         }
     };
 
-    searchInput.addEventListener('input', (e) => showSuggestions(e.target.value));
-    searchInput.addEventListener('focus', (e) => showSuggestions(e.target.value));
-    
     searchInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             performSearch(searchInput.value);
@@ -1774,18 +1779,20 @@
         performSearch(searchInput.value);
     });
     
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
-            searchSuggestions.style.display = 'none';
-        }
-    });
-
     searchSuggestions.addEventListener('click', (e) => {
         const item = e.target.closest('.suggestion-item');
         if (item) {
-            const query = item.querySelector('span').textContent;
-            searchInput.value = query;
-            performSearch(query);
+            const type = item.dataset.type;
+            if (type === 'app') {
+                const appData = JSON.parse(item.dataset.app.replace(/&apos;/g, "'"));
+                searchInput.value = appData.name;
+                searchSuggestions.style.display = 'none';
+                openAppDetails(appData);
+            } else if (type === 'search') {
+                const query = item.dataset.query;
+                searchInput.value = query;
+                performSearch(query);
+            }
         }
     });
 
@@ -2121,8 +2128,19 @@
             });
             document.getElementById('adminDeleteBtn').addEventListener('click', async () => {
                 if (confirm('Are you sure you want to delete this app?')) {
-                    await deleteApp(app.id);
-                    appDetailsOverlay.style.display = 'none';
+                    const res = await fetch(`/api/apps/${app.id}`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ admin_secret: 'admin@123' })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast('App deleted successfully! 🗑️');
+                        appDetailsOverlay.style.display = 'none';
+                        fetchApps();
+                    } else {
+                        showToast('Error: ' + data.message);
+                    }
                 }
             });
         }
@@ -2553,12 +2571,19 @@
     const deleteApp = async (id) => {
         if (!confirm('Are you sure you want to delete this app?')) return;
         try {
-            const res = await fetch(`/api/apps/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/apps/${id}`, { 
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_secret: 'admin@123' })
+            });
             const data = await res.json();
             if (data.success) {
                 allApps = allApps.filter(a => a.id !== id);
                 renderApps(allApps);
                 renderAdminAppList();
+                showToast('App deleted successfully! 🗑️');
+            } else {
+                showToast('Error: ' + data.message);
             }
         } catch (err) {
             console.error('Delete error:', err);
@@ -2600,12 +2625,17 @@
 
         const url = isEditing ? `/api/apps/${editAppIdInput.value}` : '/api/apps';
         const method = isEditing ? 'PUT' : 'POST';
+        const body = { name, developer, description, icon_url, screenshot_url, download_url, category, size, rating, reviews_count, tags };
+        
+        if (isEditing) {
+            body.admin_secret = 'admin@123';
+        }
 
         try {
             const response = await fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, developer, description, icon_url, screenshot_url, download_url, category, size, rating, reviews_count, tags })
+                body: JSON.stringify(body)
             });
             
             const result = await response.json();

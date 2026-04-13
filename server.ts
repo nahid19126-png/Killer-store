@@ -313,7 +313,13 @@ async function startServer() {
 
   // Update App
   app.put('/api/apps/:id', (req, res) => {
-    const { name, developer, description, icon_url, screenshot_url, download_url, category, size, rating, reviews_count, tags } = req.body;
+    const { name, developer, description, icon_url, screenshot_url, download_url, category, size, rating, reviews_count, tags, admin_secret } = req.body;
+    
+    // Simple admin check (in a real app, use sessions/tokens)
+    if (admin_secret !== 'admin@123') {
+      return res.status(403).json({ success: false, message: 'Unauthorized: Admin access required' });
+    }
+
     try {
       db.prepare(`
         UPDATE apps SET 
@@ -330,6 +336,12 @@ async function startServer() {
 
   // Delete Individual App
   app.delete('/api/apps/:id', (req, res) => {
+    const { admin_secret } = req.body;
+
+    if (admin_secret !== 'admin@123') {
+      return res.status(403).json({ success: false, message: 'Unauthorized: Admin access required' });
+    }
+
     try {
       db.prepare('DELETE FROM apps WHERE id = ?').run(req.params.id);
       res.json({ success: true });
