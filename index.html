@@ -2924,11 +2924,10 @@
         const endpoint = isRegisterMode ? '/api/register' : '/api/login';
         const body = isRegisterMode ? { name, email, password } : { email, password };
 
-        const fullUrl = window.location.origin + endpoint;
-        console.log('Sending auth request to:', fullUrl, { email: body.email, isRegisterMode });
+        console.log('Sending auth request to:', endpoint, { email: body.email, isRegisterMode });
 
         try {
-            const response = await fetch(fullUrl, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)

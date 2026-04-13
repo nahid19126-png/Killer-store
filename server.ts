@@ -136,15 +136,14 @@ async function startServer() {
   });
 
   // --- API Routes ---
-  const apiRouter = express.Router();
 
   // Health Check
-  apiRouter.get('/health', (req, res) => {
+  app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'API is healthy' });
   });
 
   // Register Endpoint
-  apiRouter.post('/register', (req, res) => {
+  app.post('/api/register', (req, res) => {
     const { name, email, password } = req.body;
     console.log('Register attempt:', email);
     
@@ -168,13 +167,12 @@ async function startServer() {
   });
 
   // Login Endpoint
-  apiRouter.post('/login', (req, res) => {
+  app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     const trimmedEmail = email?.trim();
-    console.log(`Login route reached. Attempt for: "${trimmedEmail}"`);
+    console.log(`Login attempt for: "${trimmedEmail}"`);
     
     try {
-      // Case-insensitive email check for better UX
       const user = db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?) AND password = ?').get(trimmedEmail, password) as any;
       
       if (user) {
@@ -191,7 +189,7 @@ async function startServer() {
   });
 
   // Get Editor's Choice
-  apiRouter.get('/apps/editors-choice', (req, res) => {
+  app.get('/api/apps/editors-choice', (req, res) => {
     try {
       const apps = db.prepare('SELECT * FROM apps WHERE is_editors_choice = 1').all();
       res.json({ success: true, apps });
@@ -201,12 +199,12 @@ async function startServer() {
   });
 
   // Reviews API
-  apiRouter.get('/apps/:id/reviews', (req, res) => {
+  app.get('/api/apps/:id/reviews', (req, res) => {
     const apps = db.prepare('SELECT * FROM reviews WHERE app_id = ? ORDER BY created_at DESC').all(req.params.id);
     res.json({ success: true, reviews: apps });
   });
 
-  apiRouter.post('/apps/:id/reviews', (req, res) => {
+  app.post('/api/apps/:id/reviews', (req, res) => {
     const { user_id, user_name, rating, comment } = req.body;
     db.prepare('INSERT INTO reviews (app_id, user_id, user_name, rating, comment) VALUES (?, ?, ?, ?, ?)')
       .run(req.params.id, user_id, user_name, rating, comment);
@@ -214,7 +212,7 @@ async function startServer() {
   });
 
   // Wishlist API
-  apiRouter.post('/wishlist', (req, res) => {
+  app.post('/api/wishlist', (req, res) => {
     const { user_id, app_id } = req.body;
     try {
       db.prepare('INSERT INTO wishlist (user_id, app_id) VALUES (?, ?)').run(user_id, app_id);
@@ -225,7 +223,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.get('/wishlist/:user_id', (req, res) => {
+  app.get('/api/wishlist/:user_id', (req, res) => {
     const apps = db.prepare(`
       SELECT apps.* FROM apps 
       JOIN wishlist ON apps.id = wishlist.app_id 
@@ -235,7 +233,7 @@ async function startServer() {
   });
 
   // Rewards API
-  apiRouter.get('/rewards/:user_id', (req, res) => {
+  app.get('/api/rewards/:user_id', (req, res) => {
     let reward = db.prepare('SELECT * FROM rewards WHERE user_id = ?').get(req.params.user_id) as any;
     if (!reward) {
       db.prepare('INSERT INTO rewards (user_id, points) VALUES (?, 0)').run(req.params.user_id);
@@ -244,15 +242,15 @@ async function startServer() {
     res.json({ success: true, points: reward.points });
   });
 
-  apiRouter.post('/rewards/claim', (req, res) => {
+  app.post('/api/rewards/claim', (req, res) => {
     const { user_id, amount } = req.body;
-    const points = amount || 10; // Use provided amount or default to 10
+    const points = amount || 10;
     db.prepare('UPDATE rewards SET points = points + ? WHERE user_id = ?').run(points, user_id);
     res.json({ success: true, added: points });
   });
 
   // Upload App
-  apiRouter.post('/apps', (req, res) => {
+  app.post('/api/apps', (req, res) => {
     const { name, developer, description, icon_url, screenshot_url, download_url, category, size, rating, reviews_count, content_rating, tags } = req.body;
     try {
       const stmt = db.prepare(`
@@ -281,7 +279,7 @@ async function startServer() {
   });
 
   // Get All Apps
-  apiRouter.get('/apps', (req, res) => {
+  app.get('/api/apps', (req, res) => {
     try {
       const apps = db.prepare('SELECT * FROM apps ORDER BY created_at DESC').all();
       res.json({ success: true, apps });
@@ -291,8 +289,8 @@ async function startServer() {
     }
   });
 
-  // Delete All Apps (To remove demo apps as requested)
-  apiRouter.delete('/apps/clear', (req, res) => {
+  // Delete All Apps
+  app.delete('/api/apps/clear', (req, res) => {
     try {
       db.prepare('DELETE FROM apps').run();
       res.json({ success: true, message: 'All apps cleared' });
@@ -302,14 +300,11 @@ async function startServer() {
   });
 
   // Update App
-  apiRouter.put('/apps/:id', (req, res) => {
+  app.put('/api/apps/:id', (req, res) => {
     const { name, developer, description, icon_url, screenshot_url, download_url, category, size, rating, reviews_count, tags, admin_secret } = req.body;
-    
-    // Simple admin check (in a real app, use sessions/tokens)
     if (admin_secret !== 'admin@123') {
-      return res.status(403).json({ success: false, message: 'Unauthorized: Admin access required' });
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
-
     try {
       db.prepare(`
         UPDATE apps SET 
@@ -325,13 +320,11 @@ async function startServer() {
   });
 
   // Delete Individual App
-  apiRouter.delete('/apps/:id', (req, res) => {
+  app.delete('/api/apps/:id', (req, res) => {
     const { admin_secret } = req.body;
-
     if (admin_secret !== 'admin@123') {
-      return res.status(403).json({ success: false, message: 'Unauthorized: Admin access required' });
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
-
     try {
       db.prepare('DELETE FROM apps WHERE id = ?').run(req.params.id);
       res.json({ success: true });
@@ -339,9 +332,6 @@ async function startServer() {
       res.status(500).json({ success: false, message: err.message });
     }
   });
-
-  // Mount API Router
-  app.use('/api', apiRouter);
 
   // API 404 Handler
   app.all('/api/*', (req, res) => {
