@@ -139,21 +139,24 @@ async function startServer() {
 
   // Register Endpoint
   app.post('/api/register', (req, res) => {
-    console.log('Register attempt:', req.body.email);
     const { name, email, password } = req.body;
+    console.log('Register attempt:', email);
+    
+    if (!email || !password || !name) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
     try {
       const stmt = db.prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)');
       const info = stmt.run(name, email, password, 'user');
       console.log('Register success:', email);
-      res.setHeader('Content-Type', 'application/json');
       res.json({ success: true, user: { id: info.lastInsertRowid, name, email, role: 'user' } });
     } catch (err: any) {
       console.error('Register error:', err.message);
-      res.setHeader('Content-Type', 'application/json');
       if (err.message.includes('UNIQUE constraint failed')) {
         res.status(400).json({ success: false, message: 'Email already exists' });
       } else {
-        res.status(500).json({ success: false, message: 'Database error' });
+        res.status(500).json({ success: false, message: 'Internal server error' });
       }
     }
   });
@@ -162,39 +165,22 @@ async function startServer() {
   app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     const trimmedEmail = email?.trim();
-    console.log(`Login attempt for: "${trimmedEmail}" with password: "${password}"`);
+    console.log(`Login attempt for: "${trimmedEmail}"`);
     
     try {
       // Case-insensitive email check for better UX
       const user = db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?) AND password = ?').get(trimmedEmail, password) as any;
       
-      res.setHeader('Content-Type', 'application/json');
       if (user) {
         console.log('Login success for:', trimmedEmail, 'Role:', user.role);
         res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
       } else {
         console.log('Login failed: Invalid credentials for', trimmedEmail);
-        
-        // Detailed log for debugging
-        const userExists = db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(trimmedEmail) as any;
-        if (userExists) {
-          console.log(`DEBUG: User "${trimmedEmail}" exists. Stored password: "${userExists.password}". Provided password: "${password}"`);
-          if (userExists.password !== password) {
-            console.log('DEBUG: Password mismatch detected.');
-          }
-        } else {
-          console.log(`DEBUG: User "${trimmedEmail}" does not exist in database.`);
-          // List all users for debugging
-          const allUsers = db.prepare('SELECT email FROM users').all();
-          console.log('DEBUG: Current users in DB:', allUsers.map((u: any) => u.email).join(', '));
-        }
-        
         res.status(401).json({ success: false, message: 'Invalid email or password' });
       }
     } catch (err: any) {
       console.error('Login error:', err.message);
-      res.setHeader('Content-Type', 'application/json');
-      res.status(500).json({ success: false, message: 'Database error' });
+      res.status(500).json({ success: false, message: 'Internal server error' });
     }
   });
 
@@ -348,6 +334,11 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
     }
+  });
+
+  // API 404 Handler
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({ success: false, message: `API route not found: ${req.method} ${req.url}` });
   });
 
   // --- Vite Integration ---
